@@ -4,25 +4,28 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class DashboardDto(
-    val totalGroups: Int,
-    val ungradedSubmissions: Int,
-    val lessonsToday: Int,
-    val todaySchedule: List<TodayLessonDto>
+    val totalGroups: Int = 0,
+    val ungradedSubmissions: Int = 0,
+    val lessonsToday: Int = 0,
+    val todaySchedule: List<TodayLessonDto> = emptyList()
 )
+
 
 @Serializable
 data class TodayLessonDto(
-    val lessonId: String,
-    val startTime: String,
-    val endTime: String,
-    val groupName: String,
-    val subjectName: String,
-    val roomName: String,
-    val isPast: Boolean,
-    val attendanceRate: Double? = null,
+    val lessonId: String = "",
+    val startTime: String = "",
+    val endTime: String = "",
+    val groupName: String = "",
+    val subjectName: String = "",
+    val roomName: String = "",
+    val isPast: Boolean = false,
+    val attendanceRate: Int? = null,
     val presentCount: Int? = null,
     val totalStudents: Int? = null
 )
+
+
 @Serializable
 data class PerformanceAssignmentDto(
     val assignmentId: String,

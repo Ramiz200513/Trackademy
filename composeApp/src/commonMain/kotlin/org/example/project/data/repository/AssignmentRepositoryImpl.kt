@@ -31,7 +31,6 @@ import org.example.project.data.remote.dto.SubmissionDetailFullDto
 class AssignmentRepositoryImpl(
     private val httpClient: HttpClient,
     private val settings: Settings,
-    private val baseUrl: String = "https://trackademy.kz/"
 ) : AssignmentRepository {
 
     override suspend fun getAssignmentDetails(id: String): Result<AssignmentDetailDto, NetworkError> {
@@ -111,9 +110,7 @@ class AssignmentRepositoryImpl(
             val token = settings.getString("token", "")
 
             val path = when {
-                url.startsWith("http") ->
-                    url.substringAfter("trackademy.kz/")
-                        .let { if (it.startsWith("api/")) it else "api/$it" }
+                url.startsWith("http") -> url
                 url.startsWith("api/") -> url
                 else -> "api/$url"
             }
@@ -137,7 +134,6 @@ class AssignmentRepositoryImpl(
             Result.Error(NetworkError.Unknown)
         }
     }
-
     override suspend fun getSubmissionDetails(submissionId: String): Result<SubmissionDetailFullDto, NetworkError> {
         return try {
             val token = settings.getString("token", "")

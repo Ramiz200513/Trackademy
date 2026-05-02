@@ -41,8 +41,7 @@ class DefaultMainComponent(
     private val teacherRepository: TeacherRepository,
     override val userRole: Int,
     private val dashboardRepository: DashboardRepository,
-
-    ) : MainComponent, ComponentContext by componentContext {
+) : MainComponent, ComponentContext by componentContext {
 
     private val navigation = StackNavigation<Config>()
 
@@ -53,9 +52,11 @@ class DefaultMainComponent(
         handleBackButton = true,
         childFactory = ::createChild
     )
+
     init {
         println("MAIN COMPONENT INIT, orgId=$orgId, userRole=$userRole")
     }
+
     private fun createChild(
         config: Config,
         componentContext: ComponentContext
@@ -66,21 +67,31 @@ class DefaultMainComponent(
                     componentContext = componentContext,
                     repository = scheduleRepository,
                     orgId = orgId,
-                    userRole = userRole
+                    userRole = userRole,
+                    settings = settings
                 )
             )
             is Config.TeacherAttendance -> MainComponent.MainChild.TeacherAttendance(
-                TeacherAttendanceComponent(componentContext, teacherRepository, orgId,onLogout)
+                TeacherAttendanceComponent(
+                    componentContext,
+                    teacherRepository,
+                    orgId,
+                    onLogout,
+                    settings
+                )
             )
             is Config.TeacherAssignments -> MainComponent.MainChild.TeacherAssignments(
-                TeacherAssignmentComponent(componentContext, teacherRepository, orgId,onLogout)
+                TeacherAssignmentComponent(
+                    componentContext,
+                    teacherRepository,
+                    orgId,
+                    onLogout,
+                    settings
+                )
             )
             is Config.Performance -> {
-                if (userRole == 3) {
-                    MainComponent.MainChild.Dashboard(
-                        DashboardComponent(componentContext, dashboardRepository,onLogout)
-                    )
-                } else {
+                // userRole == 1 — студент, иначе учитель/админ
+                if (userRole == 1) {
                     MainComponent.MainChild.Performance(
                         DefaultPerformanceComponent(
                             componentContext = componentContext,
@@ -89,9 +100,17 @@ class DefaultMainComponent(
                             onNavigateToAssignment = {}
                         )
                     )
+                } else {
+                    MainComponent.MainChild.Dashboard(
+                        DashboardComponent(
+                            componentContext,
+                            dashboardRepository,
+                            onLogout,
+                            settings
+                        )
+                    )
                 }
             }
-
             is Config.Assignments -> MainComponent.MainChild.Assignments(
                 AssignmentComponent(
                     componentContext = componentContext,
@@ -110,7 +129,7 @@ class DefaultMainComponent(
             is Config.Materials -> MainComponent.MainChild.Materials(
                 MaterialComponent(
                     componentContext = componentContext,
-                    repository = materialRepository,  // ← правильный репозиторий
+                    repository = materialRepository,
                     fileSaver = fileSaver,
                     settings = settings
                 )
@@ -134,11 +153,11 @@ class DefaultMainComponent(
 
     @Serializable
     private sealed interface Config {
-        @Serializable data object Profile: Config
+        @Serializable data object Profile : Config
         @Serializable data object Assignments : Config
-        @Serializable data object Schedule    : Config
+        @Serializable data object Schedule : Config
         @Serializable data object Performance : Config
-        @Serializable data object Materials   : Config
+        @Serializable data object Materials : Config
         @Serializable data object TeacherAttendance : Config
         @Serializable data object TeacherAssignments : Config
     }

@@ -33,7 +33,7 @@ fun PerformanceScreen(component: PerformanceComponent) {
         modifier = Modifier.fillMaxSize().background(BgDark)
     ) {
         // --- Шапка ---
-        Box(
+          Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color(0xFF3D1F8C), PurpleAccent)))
@@ -54,8 +54,10 @@ fun PerformanceScreen(component: PerformanceComponent) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            state.userName.take(2).uppercase(),
-                            color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold
+                            text = state.userInitials,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

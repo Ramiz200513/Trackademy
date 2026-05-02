@@ -85,7 +85,7 @@ fun DashboardScreen(component: DashboardComponent) {
                                         fontSize = 13.sp
                                     )
                                 }
-                                HeaderAvatar(initials = "ИО", onLogout = component.onLogout)
+                                HeaderAvatar(initials = state.userInitials, onLogout = component.onLogout)
                             }
                         }
                     }

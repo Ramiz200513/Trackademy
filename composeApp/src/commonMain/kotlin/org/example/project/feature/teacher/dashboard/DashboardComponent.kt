@@ -1,6 +1,8 @@
 package org.example.project.feature.teacher.dashboard
+
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.coroutines.coroutineScope
+import com.russhwolf.settings.Settings // НЕ ЗАБУДЬ ИМПОРТ
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +16,8 @@ import org.example.project.domain.repository.DashboardRepository
 class DashboardComponent(
     componentContext: ComponentContext,
     private val repository: DashboardRepository,
-    val onLogout: () -> Unit
+    val onLogout: () -> Unit,
+    private val settings: Settings // 1. ДОБАВИЛИ SETTINGS
 ) : ComponentContext by componentContext {
 
     private val scope = coroutineScope()
@@ -22,6 +25,12 @@ class DashboardComponent(
     val state: StateFlow<DashboardState> = _state.asStateFlow()
 
     init {
+        val fullName = settings.getString("fullName", "Преподаватель")
+        val initials = fullName.split(" ").filter { it.isNotBlank() }
+            .mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.take(2).joinToString("")
+
+        _state.update { it.copy(userInitials = initials) }
+
         load()
     }
 
@@ -43,5 +52,6 @@ class DashboardComponent(
 data class DashboardState(
     val isLoading: Boolean = false,
     val error: Boolean = false,
-    val data: DashboardDto? = null
+    val data: DashboardDto? = null,
+    val userInitials: String = "??"
 )

@@ -28,6 +28,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation("io.coil-kt.coil3:coil-compose:3.0.4")
             implementation("io.github.vinceglb:filekit-compose:0.8.0") // Проверь свежую версию
             implementation("io.github.onseok:peekaboo-ui:0.5.2")
             implementation("io.github.onseok:peekaboo-image-picker:0.5.2")

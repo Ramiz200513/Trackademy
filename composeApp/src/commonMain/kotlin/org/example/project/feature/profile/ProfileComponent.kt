@@ -73,6 +73,7 @@ class ProfileComponent(
             when (val result = repository.getMe()) {
                 is Result.Success -> {
                     val profile = result.data
+                    settings.putString("fullName", profile.fullName)
                     _state.update { it.copy(profile = profile, isLoading = false) }
                     // Load coin balance after getting profile
                     val orgId = profile.organizationId ?: settings.getString("orgId", "")

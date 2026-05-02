@@ -35,6 +35,7 @@ import com.preat.peekaboo.image.picker.SelectionMode
 import com.preat.peekaboo.image.picker.rememberImagePickerLauncher
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalUriHandler
+import org.example.project.core.ui.components.DownloadSnackbar
 import org.example.project.data.remote.dto.AssignmentDetailDto
 import org.example.project.core.ui.theme.*
 
@@ -146,6 +147,7 @@ fun AssignmentScreen(component: AssignmentComponent) {
                 AssignmentDetailSheet(
                     assignment = assignment,
                     details = state.selectedDetails,
+                    isDownloadingFile = state.isDownloadingFile,
                     onClose = { component.closeDetail() },
                     onSubmit = { textContent, imageBytes ->
                         component.submitWork(assignment.id, textContent, imageBytes)
@@ -156,6 +158,15 @@ fun AssignmentScreen(component: AssignmentComponent) {
                 )
             }
         }
+        DownloadSnackbar(
+            state = state.downloadSnackbar,
+            onOpen = { component.openDownloadedFile() },
+            onDismiss = { component.dismissSnackbar() },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
+
     }
 }
 
@@ -231,6 +242,7 @@ private fun AssignmentCard(assignment: Assignment, onClick: () -> Unit) {
 fun AssignmentDetailSheet(
     assignment: Assignment,
     details: AssignmentDetailDto?,
+    isDownloadingFile: Boolean,          // ← новый параметр
     onClose: () -> Unit,
     onSubmit: (String, ByteArray?) -> Unit,
     onDownloadFile: (String, String) -> Unit
@@ -244,9 +256,7 @@ fun AssignmentDetailSheet(
         selectionMode = SelectionMode.Single,
         scope = scope,
         onResult = { byteArrays ->
-            byteArrays.firstOrNull()?.let {
-                selectedImageBytes = it
-            }
+            byteArrays.firstOrNull()?.let { selectedImageBytes = it }
         }
     )
 
@@ -271,6 +281,7 @@ fun AssignmentDetailSheet(
                 .background(sheetBg)
                 .clickable(enabled = false) {}
         ) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -292,7 +303,12 @@ fun AssignmentDetailSheet(
                         .size(32.dp)
                         .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Закрыть", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Закрыть",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 
@@ -300,6 +316,7 @@ fun AssignmentDetailSheet(
                 modifier = Modifier.weight(1f).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
+                // ── Детали задания ──────────────────────────────────────────
                 item {
                     Text("Детали задания", color = textLight, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
@@ -311,6 +328,34 @@ fun AssignmentDetailSheet(
                     }
                     Spacer(Modifier.height(16.dp))
                     DetailGridItem("Статус", assignment.status, textLight)
+
+                    // Оценка (если есть)
+                    if (assignment.score != null) {
+                        Spacer(Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF10B981).copy(alpha = 0.12f))
+                                .border(1.dp, Color(0xFF10B981).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                                .padding(14.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🏆", fontSize = 20.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("Оценка", color = textDimmed, fontSize = 11.sp)
+                                    Text(
+                                        "${assignment.score}",
+                                        color = Color(0xFF10B981),
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth()) {
                         DetailGridItem("Выдано", assignment.assignedDate, textLight, Modifier.weight(1f))
@@ -320,158 +365,281 @@ fun AssignmentDetailSheet(
 
                 item { HorizontalDivider(color = Color(0xFF3F4152)) }
 
+                // ── Файл задания от преподавателя ───────────────────────────
                 if (details == null) {
                     item {
-                        Box(Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = purplePrimary, modifier = Modifier.size(24.dp))
+                        Box(
+                            Modifier.fillMaxWidth().padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = purplePrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 } else {
                     if (details.hasAttachment && details.attachmentName != null) {
                         item {
-                            Text("Файл от преподавателя", color = textLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Файл от преподавателя",
+                                color = textLight,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Spacer(Modifier.height(8.dp))
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f)) // Синий фон
-                                    .clickable {
-                                        if (details != null) {
-                                            onDownloadFile("Assignment/${details.id}/download", details.attachmentName ?: "file")                              }
+                                    .background(Color(0xFF3B82F6).copy(alpha = 0.15f))
+                                    .border(
+                                        1.dp,
+                                        Color(0xFF3B82F6).copy(alpha = 0.35f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable(enabled = !isDownloadingFile) {
+                                        onDownloadFile(
+                                            "api/Assignment/${details.id}/download",
+                                            details.attachmentName
+                                        )
                                     }
                                     .padding(12.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("📎", fontSize = 20.sp)
+                                    if (isDownloadingFile) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(22.dp),
+                                            color = Color(0xFF3B82F6),
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Text("📎", fontSize = 20.sp)
+                                    }
                                     Spacer(Modifier.width(8.dp))
                                     Column {
-                                        Text(details.attachmentName, color = Color(0xFF3B82F6), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                        Text("${(details.attachmentSize ?: 0) / 1024} KB", color = textDimmed, fontSize = 12.sp)
+                                        Text(
+                                            details.attachmentName,
+                                            color = Color(0xFF3B82F6),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            "${(details.attachmentSize ?: 0) / 1024} KB • Нажмите чтобы открыть",
+                                            color = textDimmed,
+                                            fontSize = 11.sp
+                                        )
                                     }
                                 }
                             }
                         }
                     }
 
+                    // ── Загруженные работы студента ─────────────────────────
                     val studentSubmission = details.studentSubmissions.firstOrNull()?.submission
                     if (studentSubmission != null && studentSubmission.files.isNotEmpty()) {
                         item {
-                            Text("Ваши загруженные работы", color = textLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "Ваши загруженные работы",
+                                color = textLight,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Spacer(Modifier.height(8.dp))
 
-                            // Перебираем все загруженные файлы
                             studentSubmission.files.forEach { file ->
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(bottom = 8.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(inputBg) // Серый фон
-                                        .clickable {
-                                            onDownloadFile("Submission/file/${file.id}", file.originalFileName)
+                                        .background(inputBg)
+                                        .border(
+                                            1.dp,
+                                            Color(0xFF4B4D60),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable(enabled = !isDownloadingFile) {
+                                            onDownloadFile(
+                                                "api/Submission/file/${file.id}",
+                                                file.originalFileName
+                                            )
                                         }
                                         .padding(12.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("📄", fontSize = 20.sp)
+                                        if (isDownloadingFile) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = purplePrimary,
+                                                strokeWidth = 2.dp
+                                            )
+                                        } else {
+                                            Text("📄", fontSize = 20.sp)
+                                        }
                                         Spacer(Modifier.width(8.dp))
                                         Column {
-                                            Text(file.originalFileName, color = textLight, fontSize = 14.sp)
+                                            Text(
+                                                file.originalFileName,
+                                                color = textLight,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                "Нажмите чтобы открыть",
+                                                color = textDimmed,
+                                                fontSize = 11.sp
+                                            )
                                         }
+                                    }
+                                }
+                            }
+
+                            // Текст работы (если есть)
+                            if (!studentSubmission.textContent.isNullOrBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(inputBg)
+                                        .padding(12.dp)
+                                ) {
+                                    Column {
+                                        Text("Текст работы", color = textDimmed, fontSize = 11.sp)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            studentSubmission.textContent,
+                                            color = textLight,
+                                            fontSize = 13.sp
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
-                // --- КОНЕЦ БЛОКА ФАЙЛОВ ---
 
                 item { HorizontalDivider(color = Color(0xFF3F4152)) }
 
-                // БЛОК 2: Текст работы
-                item {
-                    Text("Комментарий / Текст работы", color = textLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = textWork,
-                        onValueChange = { textWork = it },
-                        modifier = Modifier.fillMaxWidth().height(140.dp),
-                        placeholder = { Text("Введите текст вашей работы...", color = textDimmed, fontSize = 14.sp) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = inputBg,
-                            unfocusedContainerColor = inputBg,
-                            focusedBorderColor = purplePrimary,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedTextColor = textLight,
-                            unfocusedTextColor = textLight
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
+                // ── Поле ввода (только если можно сдать) ───────────────────
+                val canSubmit = assignment.status == "К выполнению" || assignment.status == "Просрочено"
 
-                // БЛОК 3: Прикрепление файлов
-                item {
-                    Text("Прикрепить файлы", color = textLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-
-                    val dashEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                            .drawBehind {
-                                drawRoundRect(
-                                    color = Color(0xFF6B7280),
-                                    style = Stroke(width = 3f, pathEffect = dashEffect),
-                                    cornerRadius = CornerRadius(12.dp.toPx())
+                if (canSubmit) {
+                    item {
+                        Text(
+                            "Комментарий / Текст работы",
+                            color = textLight,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = textWork,
+                            onValueChange = { textWork = it },
+                            modifier = Modifier.fillMaxWidth().height(140.dp),
+                            placeholder = {
+                                Text(
+                                    "Введите текст вашей работы...",
+                                    color = textDimmed,
+                                    fontSize = 14.sp
                                 )
-                            }
-                            .clickable {
-                                singleImagePicker.launch()
                             },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (selectedImageBytes != null) {
-                                Text("✅ Фото выбрано!", color = Color(0xFF10B981), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.height(4.dp))
-                                Text("Размер: ${selectedImageBytes!!.size / 1024} KB", color = textDimmed, fontSize = 12.sp)
-                            } else {
-                                Text("↑", color = textDimmed, fontSize = 24.sp)
-                                Spacer(Modifier.height(4.dp))
-                                Text("Нажмите для выбора из галереи", color = textDimmed, fontSize = 12.sp)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = inputBg,
+                                unfocusedContainerColor = inputBg,
+                                focusedBorderColor = purplePrimary,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = textLight,
+                                unfocusedTextColor = textLight
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                    }
+
+                    item {
+                        Text(
+                            "Прикрепить файл",
+                            color = textLight,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+
+                        val dashEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 15f), 0f)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .drawBehind {
+                                    drawRoundRect(
+                                        color = Color(0xFF6B7280),
+                                        style = Stroke(
+                                            width = 3f,
+                                            pathEffect = dashEffect
+                                        ),
+                                        cornerRadius = CornerRadius(12.dp.toPx())
+                                    )
+                                }
+                                .clickable { singleImagePicker.launch() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (selectedImageBytes != null) {
+                                    Text(
+                                        "✅ Фото выбрано!",
+                                        color = Color(0xFF10B981),
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Размер: ${selectedImageBytes!!.size / 1024} KB",
+                                        color = textDimmed,
+                                        fontSize = 12.sp
+                                    )
+                                } else {
+                                    Text("↑", color = textDimmed, fontSize = 24.sp)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Нажмите для выбора из галереи",
+                                        color = textDimmed,
+                                        fontSize = 12.sp
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // ФУТЕР С КНОПКАМИ
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(sheetBg)
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onClose) {
-                    Text("Отмена", color = textLight, fontWeight = FontWeight.Medium)
-                }
-                Spacer(Modifier.weight(1f))
-                Button(
-                    onClick = {
-                        onSubmit(textWork, selectedImageBytes)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = purplePrimary),
-                    shape = RoundedCornerShape(8.dp)
+            // ── Footer ──────────────────────────────────────────────────────
+            val canSubmit = assignment.status == "К выполнению" || assignment.status == "Просрочено"
+            if (canSubmit) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(sheetBg)
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Сдать работу", color = Color.White)
+                    TextButton(onClick = onClose) {
+                        Text("Отмена", color = textLight, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = { onSubmit(textWork, selectedImageBytes) },
+                        colors = ButtonDefaults.buttonColors(containerColor = purplePrimary),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Сдать работу", color = Color.White)
+                    }
                 }
             }
         }
     }
 }
+
 @Composable
 private fun DetailGridItem(label: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {

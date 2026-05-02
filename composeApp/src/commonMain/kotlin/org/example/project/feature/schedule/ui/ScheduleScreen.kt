@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,10 +52,17 @@ private fun accentFor(name: String): Color {
 fun ScheduleScreen(component: ScheduleComponent) {
     val state by component.state.collectAsState()
 
+    val onLessonClick: (String) -> Unit = { id ->
+        component.handleIntent(ScheduleIntent.OpenLesson(id))
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().background(BgDark)
     ) {
-        ScheduleHeader(lessonCount = state.lessons.size)
+        ScheduleHeader(
+            lessonCount = state.lessons.size,
+            initials = state.userInitials
+        )
 
         ViewModeTabs(
             selected = state.viewMode,
@@ -90,21 +98,25 @@ fun ScheduleScreen(component: ScheduleComponent) {
                 ViewMode.LIST -> LessonListView(
                     modifier = Modifier.weight(1f),
                     lessons = state.lessons,
-                    selectedDate = state.selectedDate
+                    selectedDate = state.selectedDate,
+                    onLessonClick = onLessonClick
                 )
                 ViewMode.DAY -> DayView(
                     modifier = Modifier.weight(1f),
                     lessons = state.lessons,
-                    selectedDate = state.selectedDate
+                    selectedDate = state.selectedDate,
+                    onLessonClick = onLessonClick
                 )
                 else -> LessonTimelineView(
                     modifier = Modifier.weight(1f),
                     lessons = state.lessons,
-                    selectedDate = state.selectedDate
+                    selectedDate = state.selectedDate,
+                    onLessonClick = onLessonClick
                 )
             }
         }
     }
+
     AnimatedVisibility(
         visible = state.selectedLesson != null || state.isLessonLoading,
         enter = slideInVertically { it },
@@ -120,6 +132,7 @@ fun ScheduleScreen(component: ScheduleComponent) {
         )
     }
 }
+
 @Composable
 private fun LessonDetailSheet(
     lesson: LessonDto?,
@@ -129,7 +142,6 @@ private fun LessonDetailSheet(
     onClose: () -> Unit,
     onSaveAttendance: (List<AttendanceMarkDto>) -> Unit
 ) {
-    // attendance state для учителя
     val attendanceMap = remember(lesson?.id) {
         mutableStateMapOf<String, Int>().also { map ->
             lesson?.students?.forEach { s ->
@@ -153,7 +165,6 @@ private fun LessonDetailSheet(
                 .background(SurfaceDark)
                 .clickable(enabled = false) {}
         ) {
-            // Handle
             Box(
                 modifier = Modifier
                     .padding(top = 10.dp)
@@ -172,13 +183,10 @@ private fun LessonDetailSheet(
 
             lesson ?: return@Column
 
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(
-                        Brush.horizontalGradient(listOf(Color(0xFF3D1F8C), PurpleAccent))
-                    )
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF3D1F8C), PurpleAccent)))
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -196,7 +204,6 @@ private fun LessonDetailSheet(
                         fontSize = 12.sp
                     )
                 }
-                // Статус урока
                 val statusColor = when (lesson.lessonStatus) {
                     "Completed" -> TealAccent
                     "Cancelled" -> Color(0xFFEF4444)
@@ -222,7 +229,6 @@ private fun LessonDetailSheet(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Основная инфо
                 item {
                     Column(
                         modifier = Modifier
@@ -249,7 +255,6 @@ private fun LessonDetailSheet(
                     }
                 }
 
-                // Для студента — его статус посещаемости
                 if (userRole == 1 && lesson.students.isNotEmpty()) {
                     item {
                         val student = lesson.students.first()
@@ -278,7 +283,6 @@ private fun LessonDetailSheet(
                     }
                 }
 
-                // Для учителя — список студентов с отметкой
                 if (userRole == 3 && lesson.students.isNotEmpty()) {
                     item {
                         Text(
@@ -297,7 +301,6 @@ private fun LessonDetailSheet(
                         )
                     }
 
-                    // Кнопка сохранить
                     if (lesson.lessonStatus != "Completed") {
                         item {
                             Button(
@@ -363,7 +366,6 @@ private fun StudentAttendanceRow(
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Аватар
         Box(
             modifier = Modifier
                 .size(36.dp)
@@ -380,7 +382,6 @@ private fun StudentAttendanceRow(
         }
         Spacer(Modifier.width(10.dp))
 
-        // Имя + оставшиеся уроки
         Column(modifier = Modifier.weight(1f)) {
             Text(student.fullName, color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             if (student.remainingLessons > 0) {
@@ -390,7 +391,6 @@ private fun StudentAttendanceRow(
             }
         }
 
-        // Кнопки статуса
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             statusOptions.forEach { (status, pair) ->
                 val (emoji, color) = pair
@@ -400,11 +400,7 @@ private fun StudentAttendanceRow(
                         .size(32.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSelected) color.copy(alpha = 0.25f) else Color(0xFF1A1A28))
-                        .border(
-                            1.dp,
-                            if (isSelected) color else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
+                        .border(1.dp, if (isSelected) color else Color.Transparent, RoundedCornerShape(8.dp))
                         .clickable { onStatusChange(status) },
                     contentAlignment = Alignment.Center
                 ) {
@@ -416,13 +412,11 @@ private fun StudentAttendanceRow(
 }
 
 @Composable
-private fun ScheduleHeader(lessonCount: Int) {
+private fun ScheduleHeader(lessonCount: Int, initials: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(listOf(Color(0xFF3D1F8C), PurpleAccent))
-            )
+            .background(Brush.verticalGradient(listOf(Color(0xFF3D1F8C), PurpleAccent)))
     ) {
         Row(
             modifier = Modifier
@@ -433,17 +427,8 @@ private fun ScheduleHeader(lessonCount: Int) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(
-                    "Расписание",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "$lessonCount занятий сегодня",
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp
-                )
+                Text("Расписание", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("$lessonCount занятий сегодня", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
             }
             Box(
                 modifier = Modifier
@@ -452,7 +437,7 @@ private fun ScheduleHeader(lessonCount: Int) {
                     .background(Color.White.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("ДТ", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(initials, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -460,7 +445,12 @@ private fun ScheduleHeader(lessonCount: Int) {
 
 @Composable
 private fun ViewModeTabs(selected: ViewMode, onSelect: (ViewMode) -> Unit) {
-    val tabs = listOf("День" to ViewMode.DAY, "Неделя" to ViewMode.WEEK, "Месяц" to ViewMode.MONTH, "Список" to ViewMode.LIST)
+    val tabs = listOf(
+        "День" to ViewMode.DAY,
+        "Неделя" to ViewMode.WEEK,
+        "Месяц" to ViewMode.MONTH,
+        "Список" to ViewMode.LIST
+    )
 
     Row(
         modifier = Modifier
@@ -495,7 +485,12 @@ private fun ViewModeTabs(selected: ViewMode, onSelect: (ViewMode) -> Unit) {
                             .padding(vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(label, color = textColor, fontSize = 12.sp, fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal)
+                        Text(
+                            label,
+                            color = textColor,
+                            fontSize = 12.sp,
+                            fontWeight = if (isOn) FontWeight.SemiBold else FontWeight.Normal
+                        )
                     }
                 }
             }
@@ -511,9 +506,7 @@ private fun WeekSection(
     onNextWeek: () -> Unit,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().background(SurfaceDark)
-    ) {
+    Column(modifier = Modifier.fillMaxWidth().background(SurfaceDark)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -526,10 +519,13 @@ private fun WeekSection(
                 Icon(Icons.Default.KeyboardArrowLeft, null, tint = TextMuted, modifier = Modifier.size(18.dp))
             }
             if (calendarDays.size == 7) {
-                val s = calendarDays.first(); val e = calendarDays.last()
+                val s = calendarDays.first()
+                val e = calendarDays.last()
                 Text(
                     "${s.dayOfMonth} ${monthShort(s.month)} — ${e.dayOfMonth} ${monthShort(e.month)}",
-                    color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium
+                    color = TextWhite,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
             IconButton(
@@ -592,28 +588,41 @@ private fun MonthSection(
         Month.APRIL, Month.JUNE, Month.SEPTEMBER, Month.NOVEMBER -> 30
         else -> 31
     }
-    val startOffset = firstDay.dayOfWeek.ordinal // Mon=0
+    val startOffset = firstDay.dayOfWeek.ordinal
 
-    Column(modifier = Modifier.fillMaxWidth().background(SurfaceDark).padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceDark)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPrevMonth, modifier = Modifier.size(28.dp).clip(CircleShape).background(CardDark)) {
+            IconButton(
+                onClick = onPrevMonth,
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(CardDark)
+            ) {
                 Icon(Icons.Default.KeyboardArrowLeft, null, tint = TextMuted, modifier = Modifier.size(18.dp))
             }
             Text(
                 "${monthFull(selectedDate.month)} ${selectedDate.year}",
-                color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold
+                color = TextWhite,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
             )
-            IconButton(onClick = onNextMonth, modifier = Modifier.size(28.dp).clip(CircleShape).background(CardDark)) {
+            IconButton(
+                onClick = onNextMonth,
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(CardDark)
+            ) {
                 Icon(Icons.Default.KeyboardArrowRight, null, tint = TextMuted, modifier = Modifier.size(18.dp))
             }
         }
 
         Row(modifier = Modifier.fillMaxWidth()) {
-            listOf("Пн","Вт","Ср","Чт","Пт","Сб","Вс").forEach { d ->
+            listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс").forEach { d ->
                 Text(d, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, color = TextDim, fontSize = 10.sp)
             }
         }
@@ -637,7 +646,11 @@ private fun MonthSection(
                                 .weight(1f)
                                 .height(36.dp)
                                 .clip(CircleShape)
-                                .background(if (isToday) PurpleAccent else if (isSelected) PurpleAccent.copy(0.25f) else Color.Transparent)
+                                .background(
+                                    if (isToday) PurpleAccent
+                                    else if (isSelected) PurpleAccent.copy(0.25f)
+                                    else Color.Transparent
+                                )
                                 .clickable { onDateSelected(date) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -657,7 +670,12 @@ private fun MonthSection(
 }
 
 @Composable
-private fun LessonTimelineView(modifier: Modifier, lessons: List<Lesson>, selectedDate: LocalDate) {
+private fun LessonTimelineView(
+    modifier: Modifier,
+    lessons: List<Lesson>,
+    selectedDate: LocalDate,
+    onLessonClick: (String) -> Unit
+) {
     if (lessons.isEmpty()) {
         EmptyState(modifier)
     } else {
@@ -669,17 +687,26 @@ private fun LessonTimelineView(modifier: Modifier, lessons: List<Lesson>, select
             item {
                 Text(
                     "${selectedDate.dayOfMonth} ${monthShort(selectedDate.month)}, ${dayOfWeekFull(selectedDate.dayOfWeek)}",
-                    color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(Modifier.height(6.dp))
             }
-            items(lessons) { LessonCard(it) }
+            items(lessons) { lesson ->
+                LessonCard(lesson, onClick = { onLessonClick(lesson.id) })
+            }
         }
     }
 }
 
 @Composable
-private fun DayView(modifier: Modifier, lessons: List<Lesson>, selectedDate: LocalDate) {
+private fun DayView(
+    modifier: Modifier,
+    lessons: List<Lesson>,
+    selectedDate: LocalDate,
+    onLessonClick: (String) -> Unit
+) {
     if (lessons.isEmpty()) {
         EmptyState(modifier)
     } else {
@@ -691,7 +718,8 @@ private fun DayView(modifier: Modifier, lessons: List<Lesson>, selectedDate: Loc
             item {
                 Text(
                     "${selectedDate.dayOfMonth} ${monthShort(selectedDate.month)}",
-                    color = TextMuted, fontSize = 11.sp
+                    color = TextMuted,
+                    fontSize = 11.sp
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -708,7 +736,11 @@ private fun DayView(modifier: Modifier, lessons: List<Lesson>, selectedDate: Loc
                         Text(lesson.endTime, color = TextDim, fontSize = 10.sp)
                     }
                     Spacer(Modifier.width(10.dp))
-                    LessonCard(lesson, modifier = Modifier.weight(1f).padding(bottom = 12.dp))
+                    LessonCard(
+                        lesson = lesson,
+                        modifier = Modifier.weight(1f).padding(bottom = 12.dp),
+                        onClick = { onLessonClick(lesson.id) }
+                    )
                 }
             }
         }
@@ -716,7 +748,12 @@ private fun DayView(modifier: Modifier, lessons: List<Lesson>, selectedDate: Loc
 }
 
 @Composable
-private fun LessonListView(modifier: Modifier, lessons: List<Lesson>, selectedDate: LocalDate) {
+private fun LessonListView(
+    modifier: Modifier,
+    lessons: List<Lesson>,
+    selectedDate: LocalDate,
+    onLessonClick: (String) -> Unit
+) {
     if (lessons.isEmpty()) {
         EmptyState(modifier)
     } else {
@@ -728,7 +765,9 @@ private fun LessonListView(modifier: Modifier, lessons: List<Lesson>, selectedDa
             item {
                 Text(
                     "Все занятия • ${lessons.size}",
-                    color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.Medium
+                    color = TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(Modifier.height(6.dp))
             }
@@ -738,6 +777,7 @@ private fun LessonListView(modifier: Modifier, lessons: List<Lesson>, selectedDa
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(CardDark)
+                        .clickable { onLessonClick(lesson.id) }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -761,7 +801,12 @@ private fun LessonListView(modifier: Modifier, lessons: List<Lesson>, selectedDa
                         Text(lesson.teacherName, color = TextMuted, fontSize = 11.sp)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("${lesson.startTime}–${lesson.endTime}", color = accentFor(lesson.subjectName), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "${lesson.startTime}–${lesson.endTime}",
+                            color = accentFor(lesson.subjectName),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                         Spacer(Modifier.height(2.dp))
                         Text(lesson.roomName, color = TextDim, fontSize = 10.sp)
                     }
@@ -772,7 +817,11 @@ private fun LessonListView(modifier: Modifier, lessons: List<Lesson>, selectedDa
 }
 
 @Composable
-private fun LessonCard(lesson: Lesson, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null ) {
+private fun LessonCard(
+    lesson: Lesson,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
     val accent = accentFor(lesson.subjectName)
 
     Box(
@@ -782,8 +831,7 @@ private fun LessonCard(lesson: Lesson, modifier: Modifier = Modifier, onClick: (
             .background(Color(0xFF13131A))
             .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-    ){
-
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -801,7 +849,6 @@ private fun LessonCard(lesson: Lesson, modifier: Modifier = Modifier, onClick: (
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
-                // Бейдж времени
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -824,7 +871,6 @@ private fun LessonCard(lesson: Lesson, modifier: Modifier = Modifier, onClick: (
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Аватар + имя преподавателя
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -839,16 +885,13 @@ private fun LessonCard(lesson: Lesson, modifier: Modifier = Modifier, onClick: (
                     Text(lesson.teacherName, color = TextMuted, fontSize = 11.sp)
                 }
 
-                // Кабинет
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1E1E2A))
-                            .padding(horizontal = 7.dp, vertical = 3.dp)
-                    ) {
-                        Text("🚪 ${lesson.roomName}", color = TextMuted, fontSize = 10.sp)
-                    }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF1E1E2A))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                ) {
+                    Text("🚪 ${lesson.roomName}", color = TextMuted, fontSize = 10.sp)
                 }
             }
 

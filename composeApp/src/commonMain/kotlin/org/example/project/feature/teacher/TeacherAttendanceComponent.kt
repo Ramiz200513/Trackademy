@@ -2,6 +2,7 @@ package org.example.project.feature.teacher
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.coroutines.coroutineScope
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +20,8 @@ class TeacherAttendanceComponent(
     componentContext: ComponentContext,
     private val repository: TeacherRepository,
     private val orgId: String,
-    val onLogout: () -> Unit
+    val onLogout: () -> Unit,
+    private val settings: Settings
 ) : ComponentContext by componentContext {
 
     private val scope = coroutineScope()
@@ -27,12 +29,19 @@ class TeacherAttendanceComponent(
     val state: StateFlow<TeacherAttendanceState> = _state.asStateFlow()
 
     init {
+        val fullName = settings.getString("fullName", "Преподаватель")
+        val initials = fullName.split(" ").filter { it.isNotBlank() }
+            .mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.take(2).joinToString("")
+
+        _state.update { it.copy(userInitials = initials) }
+
         loadGroups()
         loadStats()
         loadAttendances()
     }
 
     fun loadGroups() {
+
         scope.launch {
             when (val r = repository.getGroups(orgId)) {
                 is Result.Success -> _state.update { it.copy(groups = r.data) }
@@ -54,6 +63,7 @@ class TeacherAttendanceComponent(
         scope.launch {
             _state.update { it.copy(isLoading = true) }
             val filter = AttendanceFilterRequest(
+                organizationId = orgId,
                 groupId = _state.value.selectedGroupId,
                 status = _state.value.selectedStatus,
                 pageNumber = 1,
@@ -106,5 +116,6 @@ data class TeacherAttendanceState(
     val totalCount: Int = 0,
     val selectedGroupId: String? = null,
     val selectedStatus: Int? = null,
-    val activeTab: AttendanceTab = AttendanceTab.BY_GROUPS
+    val activeTab: AttendanceTab = AttendanceTab.BY_GROUPS,
+    val userInitials: String = "??"
 )

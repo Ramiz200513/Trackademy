@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.example.project.core.network.Result
+import org.example.project.core.ui.components.DownloadSnackbarState
 import org.example.project.domain.models.Material
 import org.example.project.domain.repository.MaterialRepository
 import org.example.project.domain.utils.FileSaver
@@ -26,6 +27,9 @@ class MaterialComponent(
     private val _state = MutableStateFlow(MaterialState())
     val state: StateFlow<MaterialState> = _state.asStateFlow()
 
+    private var lastDownloadedBytes: ByteArray? = null
+    private var lastDownloadedName: String? = null
+
     init {
         loadMaterials()
     }
@@ -42,14 +46,32 @@ class MaterialComponent(
 
     fun downloadMaterial(material: Material) {
         scope.launch {
-            _state.update { it.copy(downloadingId = material.id) }
+            _state.update {
+                it.copy(
+                    downloadingId = material.id,
+                    downloadSnackbar = DownloadSnackbarState.InProgress
+                )
+            }
             when (val result = repository.downloadMaterial(material.id)) {
                 is Result.Success -> {
+                    lastDownloadedBytes = result.data
+                    lastDownloadedName = material.originalFileName
+
                     fileSaver.saveFile(result.data, material.originalFileName)
-                    _state.update { it.copy(downloadingId = null, message = "✅ Сохранено: ${material.originalFileName}") }
+                    _state.update {
+                        it.copy(
+                            downloadingId = null,
+                            downloadSnackbar = DownloadSnackbarState.Success(material.originalFileName)
+                        )
+                    }
                 }
                 is Result.Error -> {
-                    _state.update { it.copy(downloadingId = null, message = "❌ Не удалось скачать файл") }
+                    _state.update {
+                        it.copy(
+                            downloadingId = null,
+                            downloadSnackbar = DownloadSnackbarState.Error("Не удалось скачать файл")
+                        )
+                    }
                 }
             }
         }
@@ -60,20 +82,61 @@ class MaterialComponent(
             _state.update { it.copy(downloadingId = material.id) }
             when (val result = repository.previewMaterial(material.id)) {
                 is Result.Success -> {
-                    // Для изображений — сохраняем и показываем превью
                     if (material.isImage) {
-                        _state.update { it.copy(downloadingId = null, previewBytes = result.data, previewMaterial = material) }
+                        _state.update {
+                            it.copy(
+                                downloadingId = null,
+                                previewBytes = result.data,
+                                previewMaterial = material
+                            )
+                        }
                     } else {
-                        // Для остальных файлов — скачиваем
+                        lastDownloadedBytes = result.data
+                        lastDownloadedName = material.originalFileName
                         fileSaver.saveFile(result.data, material.originalFileName)
-                        _state.update { it.copy(downloadingId = null, message = "✅ Открыто: ${material.originalFileName}") }
+                        _state.update {
+                            it.copy(
+                                downloadingId = null,
+                                downloadSnackbar = DownloadSnackbarState.Success(material.originalFileName)
+                            )
+                        }
                     }
                 }
                 is Result.Error -> {
-                    _state.update { it.copy(downloadingId = null, message = "❌ Не удалось открыть превью") }
+                    when (val fallback = repository.downloadMaterial(material.id)) {
+                        is Result.Success -> {
+                            lastDownloadedBytes = fallback.data
+                            lastDownloadedName = material.originalFileName
+                            fileSaver.saveFile(fallback.data, material.originalFileName)
+                            _state.update {
+                                it.copy(
+                                    downloadingId = null,
+                                    downloadSnackbar = DownloadSnackbarState.Success(material.originalFileName)
+                                )
+                            }
+                        }
+                        is Result.Error -> {
+                            _state.update {
+                                it.copy(
+                                    downloadingId = null,
+                                    downloadSnackbar = DownloadSnackbarState.Error("Не удалось открыть файл")
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    fun openDownloadedFile() {
+        val bytes = lastDownloadedBytes ?: return
+        val name = lastDownloadedName ?: return
+        fileSaver.saveFile(bytes, name)
+    }
+
+    fun dismissSnackbar() {
+        _state.update { it.copy(downloadSnackbar = DownloadSnackbarState.Hidden) }
     }
 
     fun closePreview() {
@@ -94,14 +157,19 @@ class MaterialComponent(
                 groupId = current.selectedGroupId,
                 searchTitle = current.searchQuery.takeIf { it.isNotBlank() }
             )) {
-                is Result.Success -> _state.update { it.copy(isLoading = false, materials = result.data) }
-                is Result.Error -> _state.update { it.copy(isLoading = false, error = "Ошибка загрузки материалов") }
+                is Result.Success -> _state.update {
+                    it.copy(isLoading = false, materials = result.data)
+                }
+                is Result.Error -> _state.update {
+                    it.copy(isLoading = false, error = "Ошибка загрузки материалов")
+                }
             }
         }
     }
 }
 
 data class MaterialState(
+    val downloadSnackbar: DownloadSnackbarState = DownloadSnackbarState.Hidden,
     val groups: List<GroupChip> = emptyList(),
     val isLoading: Boolean = false,
     val materials: List<Material> = emptyList(),

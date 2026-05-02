@@ -2,6 +2,7 @@ package org.example.project.feature.teacher
 
 import com.arkivanov.decompose.ComponentContext
 import com.arkivanov.essenty.lifecycle.coroutines.coroutineScope
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +17,8 @@ class TeacherAssignmentComponent(
     componentContext: ComponentContext,
     private val repository: TeacherRepository,
     private val orgId: String,
-    val onLogout: () -> Unit
+    val onLogout: () -> Unit,
+    private val settings: Settings
 ) : ComponentContext by componentContext {
 
     private val scope = coroutineScope()
@@ -24,6 +26,11 @@ class TeacherAssignmentComponent(
     val state: StateFlow<TeacherAssignmentState> = _state.asStateFlow()
 
     init {
+        val fullName = settings.getString("fullName", "Преподаватель")
+        val initials = fullName.split(" ").filter { it.isNotBlank() }
+            .mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.take(2).joinToString("")
+
+        _state.update { it.copy(userInitials = initials) }
         loadGroups()
         loadAssignments()
     }
@@ -115,5 +122,6 @@ data class TeacherAssignmentState(
     val selectedGroupId: String? = null,
     val selectedAssignment: AssignmentDto? = null,
     val showCreateDialog: Boolean = false,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val userInitials: String = "??"
 )

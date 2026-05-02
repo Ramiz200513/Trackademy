@@ -42,14 +42,16 @@ class AuthRepositoryImpl(
                     settings.putString("refreshToken", data.refreshToken)
                 }
                 settings.putString("orgId", orgId)
+                data.user?.fullName?.let { settings.putString("fullName", it) }
+
                 val roleString = data.user?.role
-                val roleInt = when (roleString) {
+                val userRole = when (roleString) {
                     "Student" -> 1
                     "Administrator" -> 2
                     "Teacher" -> 3
                     else -> 0
                 }
-                settings.putInt("userRole", roleInt)
+                settings.putInt("userRole", userRole)
 
                 Result.Success(Unit)
             } else {

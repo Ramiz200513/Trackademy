@@ -48,6 +48,7 @@ data class SubmissionDto(
 
 @Serializable
 data class AttendanceFilterRequest(
+    val organizationId: String? = null,
     val groupId: String? = null,
     val studentId: String? = null,
     val status: Int? = null,
@@ -56,7 +57,6 @@ data class AttendanceFilterRequest(
     val pageNumber: Int = 1,
     val pageSize: Int = 20
 )
-
 @Serializable
 data class AssignmentItemDto(
     val assignmentId: String,
@@ -129,7 +129,7 @@ data class CreateSubmissionRequest(
 @Serializable
 data class SubmissionDetailFullDto(
     val id: String,
-    val assignmentId: String,
+    val assignmentId: String? = null,
     val textContent: String? = null,
     val status: Int? = null,
     val statusName: String? = null,

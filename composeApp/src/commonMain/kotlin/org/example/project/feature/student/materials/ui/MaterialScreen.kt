@@ -17,23 +17,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import org.example.project.core.ui.components.DownloadSnackbar
+import org.example.project.core.ui.components.DownloadSnackbarState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.SubcomposeAsyncImage
 import org.example.project.domain.models.Material
 import org.example.project.feature.student.materials.MaterialComponent
 import org.example.project.core.ui.theme.*
+
 data class GroupChip(val id: String, val name: String)
-
-
-
 
 @Composable
 fun MaterialScreen(component: MaterialComponent) {
@@ -50,7 +52,6 @@ fun MaterialScreen(component: MaterialComponent) {
 
         Column(modifier = Modifier.fillMaxSize()) {
 
-            // ── Header ────────────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -72,7 +73,6 @@ fun MaterialScreen(component: MaterialComponent) {
                 }
             }
 
-            // ── Search bar ────────────────────────────────────────────────────
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = { component.onSearchChanged(it) },
@@ -100,7 +100,6 @@ fun MaterialScreen(component: MaterialComponent) {
                 singleLine = true
             )
 
-            // ── Group filter chips ─────────────────────────────────────────────
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -122,7 +121,6 @@ fun MaterialScreen(component: MaterialComponent) {
                 }
             }
 
-            // ── Content ───────────────────────────────────────────────────────
             when {
                 state.isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -168,7 +166,6 @@ fun MaterialScreen(component: MaterialComponent) {
             }
         }
 
-        // ── Toast message ─────────────────────────────────────────────────────
         AnimatedVisibility(
             visible = state.message != null,
             enter = fadeIn() + slideInVertically { -it },
@@ -181,7 +178,11 @@ fun MaterialScreen(component: MaterialComponent) {
                         .padding(horizontal = 24.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(CardDark)
-                        .border(1.dp, if (msg.startsWith("✅")) Green.copy(alpha = 0.4f) else Red.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .border(
+                            1.dp,
+                            if (msg.startsWith("✅")) Green.copy(alpha = 0.4f) else Red.copy(alpha = 0.4f),
+                            RoundedCornerShape(12.dp)
+                        )
                         .padding(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(msg, color = TextWhite, fontSize = 13.sp)
@@ -189,7 +190,6 @@ fun MaterialScreen(component: MaterialComponent) {
             }
         }
 
-        // ── Image Preview overlay ─────────────────────────────────────────────
         AnimatedVisibility(
             visible = state.previewMaterial != null,
             enter = fadeIn(),
@@ -204,6 +204,14 @@ fun MaterialScreen(component: MaterialComponent) {
                 )
             }
         }
+        DownloadSnackbar(
+            state = state.downloadSnackbar,
+            onOpen = { component.openDownloadedFile() },
+            onDismiss = { component.dismissSnackbar() },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
     }
 }
 
@@ -260,8 +268,6 @@ private fun MaterialCard(
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-
-            // File type icon box
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -274,7 +280,6 @@ private fun MaterialCard(
 
             Spacer(Modifier.width(12.dp))
 
-            // Title + description
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     material.title,
@@ -317,7 +322,6 @@ private fun MaterialCard(
 
             Spacer(Modifier.width(8.dp))
 
-            // Action buttons
             if (isDownloading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(32.dp),
@@ -329,18 +333,8 @@ private fun MaterialCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Preview button
-                    ActionIconButton(
-                        emoji = "👁",
-                        tint = Blue,
-                        onClick = onPreview
-                    )
-                    // Download button
-                    ActionIconButton(
-                        emoji = "⬇",
-                        tint = Green,
-                        onClick = onDownload
-                    )
+                    ActionIconButton(emoji = "👁", tint = Blue, onClick = onPreview)
+                    ActionIconButton(emoji = "⬇", tint = Green, onClick = onDownload)
                 }
             }
         }
@@ -377,7 +371,7 @@ private fun ImagePreviewOverlay(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.92f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(CardDark)
                 .clickable(enabled = false) {}
@@ -394,7 +388,9 @@ private fun ImagePreviewOverlay(
                     color = TextWhite,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = null, tint = TextMuted)
@@ -403,22 +399,53 @@ private fun ImagePreviewOverlay(
 
             Spacer(Modifier.height(12.dp))
 
-            // Image preview placeholder (real image rendering requires platform-specific impl)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(240.dp)
+                    .height(300.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(Color(0xFF111118)),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🖼️", fontSize = 48.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(material.originalFileName, color = TextMuted, fontSize = 12.sp)
-                    Text("${material.fileSizeKb} KB", color = TextDim, fontSize = 11.sp)
+                if (imageBytes == null) {
+                    CircularProgressIndicator(color = Purple, modifier = Modifier.size(36.dp))
+                } else {
+                    SubcomposeAsyncImage(
+                        model = imageBytes,
+                        contentDescription = material.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        loading = {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(
+                                    color = Purple,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        },
+                        error = {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text("🖼️", fontSize = 48.sp)
+                                Spacer(Modifier.height(8.dp))
+                                Text(material.originalFileName, color = TextMuted, fontSize = 12.sp)
+                                Text("Не удалось отобразить", color = Red, fontSize = 11.sp)
+                            }
+                        }
+                    )
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                "${material.fileSizeKb} KB • ${material.fileExtension.uppercase()}",
+                color = TextDim,
+                fontSize = 11.sp
+            )
 
             Spacer(Modifier.height(16.dp))
 

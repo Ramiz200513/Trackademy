@@ -84,10 +84,17 @@ fun ProfileScreen(component: ProfileComponent) {
                                     .background(Color.White.copy(alpha = 0.2f)),
                                 contentAlignment = Alignment.Center
                             ) {
+                                val initials = state.profile?.fullName
+                                    ?.split(" ")
+                                    ?.filter { it.isNotBlank() }
+                                    ?.mapNotNull { it.firstOrNull()?.toString()?.uppercase() }
+                                    ?.take(2)
+                                    ?.joinToString("") ?: "?"
+
                                 Text(
-                                    state.profile?.fullName?.firstOrNull()?.toString() ?: "?",
+                                    text = initials,
                                     color = Color.White,
-                                    fontSize = 26.sp,
+                                    fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }

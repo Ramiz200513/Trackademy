@@ -61,7 +61,7 @@ fun TeacherAssignmentScreen(component: TeacherAssignmentComponent) {
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        HeaderAvatar(initials = "ИО", onLogout = component.onLogout)
+                        HeaderAvatar(initials = state.userInitials, onLogout = component.onLogout)
                         FloatingActionButton(
                             onClick = { component.openCreate() },
                             containerColor = Color.White.copy(alpha = 0.2f),

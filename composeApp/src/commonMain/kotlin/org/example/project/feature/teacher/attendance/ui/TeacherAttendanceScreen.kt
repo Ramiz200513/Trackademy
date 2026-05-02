@@ -61,7 +61,7 @@ fun TeacherAttendanceScreen(component: TeacherAttendanceComponent) {
                             fontSize = 12.sp
                         )
                     }
-                    HeaderAvatar(initials = "ИО", onLogout = component.onLogout)
+                    HeaderAvatar(initials = state.userInitials, onLogout = component.onLogout)
                 }
 
                 Spacer(Modifier.height(16.dp))

@@ -47,6 +47,12 @@ class DefaultPerformanceComponent(
 
             if (dashboardResult is Result.Success) {
                 val d = dashboardResult.data
+                val fullName = if (userResult is Result.Success) userResult.data.fullName else "Студент"
+
+                // Вычисляем инициалы
+                val initials = fullName.split(" ").filter { it.isNotBlank() }
+                    .mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.take(2).joinToString("")
+
                 _state.update { it.copy(
                     isLoading = false,
                     avgGrade = d.averageGrade,
@@ -54,7 +60,8 @@ class DefaultPerformanceComponent(
                     activeCount = d.activeAssignmentsCount,
                     assignments = d.assignments,
                     grades = d.grades,
-                    userName = if (userResult is Result.Success) userResult.data.fullName else "Студент"
+                    userName = fullName,
+                    userInitials = initials // <--- Передаем инициалы в стейт
                 ) }
             } else if (dashboardResult is Result.Error) {
                 _state.update { it.copy(isLoading = false, error = "Ошибка загрузки данных") }

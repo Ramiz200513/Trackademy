@@ -15,10 +15,10 @@ data class ScheduleState(
     val error: String? = null,
     val calendarDays: List<LocalDate> = emptyList(),
     val viewMode: ViewMode = ViewMode.WEEK,
-    // новое:
     val selectedLesson: LessonDto? = null,
     val isLessonLoading: Boolean = false,
-    val isSavingAttendance: Boolean = false
+    val isSavingAttendance: Boolean = false,
+    val userInitials: String = "??"
 )
 
 sealed interface ScheduleIntent {

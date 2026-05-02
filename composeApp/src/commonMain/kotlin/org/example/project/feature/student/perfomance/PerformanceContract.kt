@@ -11,7 +11,8 @@ data class PerformanceState(
     val activeCount: Int = 0,
     val assignments: List<Assignment> = emptyList(),
     val grades: List<Grade> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val userInitials: String = "??"
 )
 sealed interface PerformanceIntent {
     data object Refresh : PerformanceIntent

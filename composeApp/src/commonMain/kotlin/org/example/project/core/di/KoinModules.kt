@@ -27,8 +27,9 @@ import org.koin.dsl.module
 
 val networkModule: Module = module {
     single<Settings> { Settings() }
-
+    single<TokenProvider> { SettingsTokenProvider(get()) }
     single<HttpClient> {
+
         HttpClient {
             install(ContentNegotiation) {
                 json(Json {
@@ -48,12 +49,12 @@ val networkModule: Module = module {
             install(Auth) {
                 bearer {
                     loadTokens {
-                        val settings = get<Settings>()
-                        val token = settings.getString("token", "")
-                        val refresh = settings.getString("refreshToken", "")
-                        if (token.isNotEmpty()) BearerTokens(token, refresh) else null
+                        val provider = get<TokenProvider>()
+                        val t = provider.getToken()
+                        if (t != null) {
+                            BearerTokens(t, provider.getRefreshToken() ?: "")
+                        } else null
                     }
-
                     refreshTokens {
                         val settings = get<Settings>()
                         val refreshToken = settings.getString("refreshToken", "")

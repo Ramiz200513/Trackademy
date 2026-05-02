@@ -25,8 +25,6 @@ class PerformanceRepositoryImpl(
         return try {
             val token = settings.getString("token", "")
             val userRole = settings.getInt("userRole", 0)
-
-            // учитель — дашборд учителя, студент — дашборд студента
             val endpoint = if (userRole == 1) "api/Dashboard/student" else "api/Dashboard/teacher"
 
             println("DEBUG: Используем токен: ${token.take(10)}...")
