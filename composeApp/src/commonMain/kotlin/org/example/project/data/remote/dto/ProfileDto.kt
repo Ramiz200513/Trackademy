@@ -1,5 +1,6 @@
 package org.example.project.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -55,6 +56,7 @@ data class CoinBalanceDto(
 
 @Serializable
 data class PurchaseRequest(
+    @SerialName("MarketItemId")
     val itemId: String,
     val studentId: String,
     val organizationId: String
