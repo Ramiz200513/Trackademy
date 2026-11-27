@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -31,18 +34,15 @@ class ProfileRepositoryImpl(
 
     override suspend fun getMe(): Result<UserProfileDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Auth/me") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Auth/me")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<UserProfileDto>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("PROFILE ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ProfileRepository", "PROFILE ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun purchaseItem(
@@ -51,19 +51,17 @@ class ProfileRepositoryImpl(
         studentId: String
     ): Result<String, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val body = Json.encodeToString(PurchaseRequest(itemId, studentId, organizationId))
             val response = httpClient.post("api/Purchase/organization/$organizationId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 setBody(TextContent(body, ContentType.Application.Json))
             }
             if (response.status.value in 200..299) {
                 Result.Success("Покупка успешна!")
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 
@@ -72,17 +70,14 @@ class ProfileRepositoryImpl(
         organizationId: String
     ): Result<List<PurchaseHistoryDto>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Purchase/student/$studentId/organization/$organizationId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Purchase/student/$studentId/organization/$organizationId")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<List<PurchaseHistoryDto>>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun updatePassword(
@@ -90,38 +85,33 @@ class ProfileRepositoryImpl(
         newPassword: String
     ): Result<String, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val body = Json.encodeToString(UpdatePasswordRequest(currentPassword, newPassword))
             val response = httpClient.put("api/User/update-password") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 setBody(TextContent(body, ContentType.Application.Json))
             }
             if (response.status.value in 200..299) {
                 val resp = response.body<UpdatePasswordResponse>()
                 Result.Success(resp.message ?: "Пароль успешно обновлён")
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("PASSWORD ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ProfileRepository", "PASSWORD ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun getMarketItems(organizationId: String): Result<List<MarketItemDto>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/MarketItem/organization/$organizationId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/MarketItem/organization/$organizationId")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<List<MarketItemDto>>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("MARKET ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ProfileRepository", "MARKET ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 
@@ -130,18 +120,15 @@ class ProfileRepositoryImpl(
         organizationId: String
     ): Result<CoinBalanceDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Coin/$studentId/organization/$organizationId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Coin/$studentId/organization/$organizationId")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<CoinBalanceDto>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("COIN ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ProfileRepository", "COIN ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 }

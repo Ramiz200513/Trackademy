@@ -38,7 +38,6 @@ class ScheduleComponent(
     val state: StateFlow<ScheduleState> = _state.asStateFlow()
 
     init {
-        println("SCHEDULE COMPONENT INIT, orgId=$orgId, userRole=$userRole")
 
         // --- ВЫСЧИТЫВАЕМ ИНИЦИАЛЫ ---
         val fullName = settings.getString("fullName", "Аноним")

@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import org.example.project.core.network.Result
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -41,39 +44,32 @@ class TeacherRepositoryImpl(
     override suspend fun getLessonsBySchedule(request: LessonRequest): Result<PagedResponse<LessonDto>, NetworkError> {
         return try {
             val resp = httpClient.post("api/Lesson/by-schedule") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
             if (resp.status.value in 200..299) Result.Success(resp.body<PagedResponse<LessonDto>>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getLessonById(lessonId: String): Result<LessonDto, NetworkError> {
         return try {
-            val resp = httpClient.get("api/Lesson/GetLessonById/$lessonId") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
-            }
+            val resp = httpClient.get("api/Lesson/GetLessonById/$lessonId")
             if (resp.status.value in 200..299) Result.Success(resp.body<LessonDto>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
-    private fun token() = settings.getString("token", "")
     override suspend fun getTeacherDashboard(): Result<TeacherDashboardDto, NetworkError> {
         return try {
-            val resp = httpClient.get("api/Dashboard/teacher") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
-            }
+            val resp = httpClient.get("api/Dashboard/teacher")
             if (resp.status.value in 200..299) {
                 Result.Success(resp.body<TeacherDashboardDto>())
-            } else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            } else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
     override suspend fun getGroups(orgId: String): Result<List<GroupDto>, NetworkError> {
         return try {
             val resp = httpClient.post("api/Group/get-groups") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("organizationId", orgId)
@@ -83,27 +79,25 @@ class TeacherRepositoryImpl(
             }
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<PagedResponse<GroupDto>>().items)
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getAttendances(filter: AttendanceFilterRequest): Result<PagedResponse<AttendanceRecordDto>, NetworkError> {
         return try {
             val resp = httpClient.post("api/Attendance/get-all-attendances") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(filter)
             }
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<PagedResponse<AttendanceRecordDto>>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getGroupAttendanceStats(orgId: String): Result<PagedResponse<AttendanceGroupStatsDto>, NetworkError> {
         return try {
             val resp = httpClient.post("api/Attendance/stats/groups") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("organizationId", orgId)
@@ -113,65 +107,57 @@ class TeacherRepositoryImpl(
             }
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<PagedResponse<AttendanceGroupStatsDto>>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getGroupAttendanceDetails(groupId: String): Result<AttendanceGroupDetailsDto, NetworkError> {
         return try {
-            val resp = httpClient.get("api/Attendance/stats/groups/$groupId/details") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
-            }
+            val resp = httpClient.get("api/Attendance/stats/groups/$groupId/details")
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<AttendanceGroupDetailsDto>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun markAttendance(request: MarkAttendanceRequest): Result<Unit, NetworkError> {
         return try {
             val resp = httpClient.post("api/Attendance/mark-bulk") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
             if (resp.status.value in 200..299) Result.Success(Unit)
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getAssignments(filter: AssignmentFilterRequest): Result<PagedResponse<AssignmentDto>, NetworkError> {
         return try {
             val resp = httpClient.post("api/Assignment/get-assignments") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(filter)
             }
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<PagedResponse<AssignmentDto>>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun getAssignmentDetail(id: String): Result<AssignmentDto, NetworkError> {
         return try {
-            val resp = httpClient.get("api/Assignment/$id") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
-            }
+            val resp = httpClient.get("api/Assignment/$id")
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<AssignmentDto>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun deleteAssignment(id: String): Result<Unit, NetworkError> {
         return try {
-            val resp = httpClient.delete("api/Assignment/$id") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
-            }
+            val resp = httpClient.delete("api/Assignment/$id")
             if (resp.status.value in 200..299) Result.Success(Unit)
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun createAssignment(
@@ -180,7 +166,6 @@ class TeacherRepositoryImpl(
     ): Result<String, NetworkError> {
         return try {
             val resp = httpClient.post("api/Assignment/create-with-file") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 setBody(MultiPartFormDataContent(formData {
                     append("groupId", groupId)
                     append("description", description)
@@ -194,14 +179,13 @@ class TeacherRepositoryImpl(
             }
             if (resp.status.value in 200..299)
                 Result.Success(resp.body<String>())
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 
     override suspend fun updateAssignment(id: String, description: String, dueDate: String): Result<Unit, NetworkError> {
         return try {
             val resp = httpClient.put("api/Assignment/$id") {
-                header(HttpHeaders.Authorization, "Bearer ${token()}")
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("description", description)
@@ -209,7 +193,7 @@ class TeacherRepositoryImpl(
                 })
             }
             if (resp.status.value in 200..299) Result.Success(Unit)
-            else Result.Error(NetworkError.ServerError)
-        } catch (e: Exception) { Result.Error(NetworkError.Unknown) }
+            else Result.Error(resp.status.toNetworkError())
+        } catch (e: Exception) { Result.Error(e.toNetworkError()) }
     }
 }

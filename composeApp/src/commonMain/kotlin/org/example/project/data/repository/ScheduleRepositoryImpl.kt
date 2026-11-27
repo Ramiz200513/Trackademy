@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -39,59 +42,51 @@ class ScheduleRepositoryImpl(
     private val baseUrl = "api/"
     override suspend fun getLessons(params: LessonRequest): Result<List<Lesson>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            println("LESSONS REQUEST body: $params")
-            println("LESSONS TOKEN: ${token.take(20)}")
+            AppLogger.d("ScheduleRepository", "LESSONS REQUEST body: $params")
 
             val response = httpClient.post("api/Lesson/by-schedule") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(params)
             }
 
             val bodyText = response.bodyAsText()
-            println("DEBUG: Статус: ${response.status}")
-            println("DEBUG: Тело: $bodyText")
-            println("DEBUG: Params: $params")
+            AppLogger.d("ScheduleRepository", "DEBUG: Статус: ${response.status}")
+            AppLogger.d("ScheduleRepository", "DEBUG: Тело: $bodyText")
+            AppLogger.d("ScheduleRepository", "DEBUG: Params: $params")
 
             if (response.status.value in 200..299) {
                 val json = Json { ignoreUnknownKeys = true }
                 val dtos = json.decodeFromString<PagedResponse<LessonDto>>(bodyText).items
                 Result.Success(dtos.map { it.toDomain() })
             }else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("LESSONS EXCEPTION: ${e::class.simpleName} — ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ScheduleRepository", "LESSONS EXCEPTION: ${e::class.simpleName} — ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun getScheduleIds(orgId: String): Result<List<String>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            println("SCHEDULE IDS REQUEST, orgId=$orgId, token=${token.take(10)}")
             val response = httpClient.post("api/Schedule/get-all-schedules") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(ScheduleAllRequest(organizationId = orgId, pageNumber = 1, pageSize = 100, includeDeleted = false))
             }
             val body = response.bodyAsText()
-            println("SCHEDULE IDS STATUS: ${response.status}")
-            println("SCHEDULE IDS BODY: ${body.take(200)}")
+            AppLogger.d("ScheduleRepository", "SCHEDULE IDS STATUS: ${response.status}")
+            AppLogger.d("ScheduleRepository", "SCHEDULE IDS BODY: ${body.take(200)}")
             if (response.status == HttpStatusCode.OK) {
                 val paged = Json.decodeFromString<PagedResponse<ScheduleDto>>(body)
                 Result.Success(paged.items.map { it.id })
-            } else Result.Error(NetworkError.ServerError)
+            } else Result.Error(response.status.toNetworkError())
         } catch (e: Exception) {
-            println("SCHEDULE IDS EXCEPTION: ${e::class.simpleName} — ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("ScheduleRepository", "SCHEDULE IDS EXCEPTION: ${e::class.simpleName} — ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun getGroups(orgId: String): Result<List<Group>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val response = httpClient.post("${baseUrl}Group/get-groups") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(GroupRequest(organizationId = orgId))
             }
@@ -101,18 +96,16 @@ class ScheduleRepositoryImpl(
                 val dtos = response.body<PagedResponse<GroupDto>>().items
                 Result.Success(dtos.map { Group(it.id, it.name) })
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun getRooms(orgId: String): Result<List<Room>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val response = httpClient.post("${baseUrl}Room/GetAllRooms") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(RoomRequest(organizationId = orgId))
             }
@@ -121,38 +114,33 @@ class ScheduleRepositoryImpl(
                 val dtos = response.body<PagedResponse<RoomDto>>().items
                 Result.Success(dtos.map { Room(it.id, it.name) })
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun getLessonById(lessonId: String): Result<LessonDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Lesson/GetLessonById/$lessonId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Lesson/GetLessonById/$lessonId")
             if (response.status.value in 200..299)
                 Result.Success(response.body<LessonDto>())
-            else Result.Error(NetworkError.ServerError)
+            else Result.Error(response.status.toNetworkError())
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun markAttendance(request: MarkAttendanceRequest): Result<Unit, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val response = httpClient.post("api/Attendance/mark-bulk") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
             if (response.status.value in 200..299) Result.Success(Unit)
-            else Result.Error(NetworkError.ServerError)
+            else Result.Error(response.status.toNetworkError())
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 }

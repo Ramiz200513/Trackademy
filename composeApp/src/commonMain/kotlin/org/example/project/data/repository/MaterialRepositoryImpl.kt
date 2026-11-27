@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -26,7 +29,6 @@ class MaterialRepositoryImpl(
         pageSize: Int
     ): Result<List<Material>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
 
             val params = buildString {
                 append("OrganizationId=$organizationId")
@@ -36,51 +38,43 @@ class MaterialRepositoryImpl(
                 if (!searchTitle.isNullOrBlank()) append("&SearchTitle=$searchTitle")
             }
 
-            val response = httpClient.get("api/Material?$params") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Material?$params")
 
             if (response.status.value in 200..299) {
                 val dto = response.body<MaterialsResponse>()
                 Result.Success(dto.items.map { it.toDomain() })
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("MATERIAL ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("MaterialRepository", "MATERIAL ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun downloadMaterial(materialId: String): Result<ByteArray, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Material/$materialId/download") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Material/$materialId/download")
             if (response.status.value in 200..299) {
                 Result.Success(response.readBytes())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun previewMaterial(materialId: String): Result<ByteArray, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Material/$materialId/preview") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Material/$materialId/preview")
             if (response.status.value in 200..299) {
                 Result.Success(response.readBytes())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 }

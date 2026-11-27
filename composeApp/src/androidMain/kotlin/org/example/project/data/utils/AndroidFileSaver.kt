@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Environment
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import org.example.project.core.logging.AppLogger
 import org.example.project.domain.utils.FileSaver
 import java.io.File
 
@@ -29,7 +30,7 @@ class AndroidFileSaver(private val context: Context) : FileSaver {
 
             openFile(file)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e(TAG, "Failed to save file", e)
         }
     }
 
@@ -53,8 +54,7 @@ class AndroidFileSaver(private val context: Context) : FileSaver {
 
             context.startActivity(chooser)
         } catch (e: Exception) {
-            println("❌ ОШИБКА ОТКРЫТИЯ: ${e.message}")
-            e.printStackTrace()
+            AppLogger.e(TAG, "Failed to open file", e)
         }
     }
 
@@ -65,5 +65,9 @@ class AndroidFileSaver(private val context: Context) : FileSaver {
 
     private fun sanitizeFileName(name: String): String {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+    }
+
+    private companion object {
+        const val TAG = "AndroidFileSaver"
     }
 }
