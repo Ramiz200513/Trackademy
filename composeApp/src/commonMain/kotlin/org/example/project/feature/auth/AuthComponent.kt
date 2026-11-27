@@ -12,6 +12,8 @@ import org.example.project.domain.repository.RegisterParams
 
 
 import org.example.project.core.network.Result
+import org.example.project.core.domain.NetworkError
+import org.example.project.core.ui.error.toUserMessage
 
 class AuthComponent(
     componentContext: ComponentContext,
@@ -64,16 +66,15 @@ class AuthComponent(
 
             when (result) {
                 is Result.Success -> {
-                    // Обязательно сохраняем orgId (он тебе нужен для маркета и профиля)
-                    settings.putString("orgId", _state.value.selectedOrgId)
-
-                    // Если твой сервер при логине возвращает данные юзера, сохраняем имя.
-                    // Подставь тут правильный путь до fullName в зависимости от твоего DTO (например result.data.user.fullName):
-                    // settings.putString("fullName", result.data.fullName)
-
                     onRootNavigate()
                 }
-                is Result.Error -> _state.update { it.copy(isLoading = false, error = "Ошибка входа") }
+                is Result.Error -> {
+                    val message = when (result.error) {
+                        NetworkError.Unauthorized, NetworkError.BadRequest -> "Неверный логин или пароль"
+                        else -> result.error.toUserMessage()
+                    }
+                    _state.update { it.copy(isLoading = false, error = message) }
+                }
             }
         }
     }
@@ -83,7 +84,7 @@ class AuthComponent(
         scope.launch {
             when(val result = repository.getOrganizations()){
                 is Result.Success -> _state.update { it.copy(organizations = result.data) }
-                is Result.Error -> _state.update { it.copy(error = "Ошибка загрузки организаций") }
+                is Result.Error -> _state.update { it.copy(error = result.error.toUserMessage()) }
             }
         }
     }
@@ -103,7 +104,7 @@ class AuthComponent(
                 activationKey = draft.activationKey
             )
 
-            when (repository.register(params)) {
+            when (val result = repository.register(params)) {
                 is Result.Success -> {
                     // При регистрации имя у нас уже есть прямо в черновике!
                     settings.putString("orgId", draft.organizationId)
@@ -111,7 +112,7 @@ class AuthComponent(
 
                     onRootNavigate()
                 }
-                is Result.Error -> _state.update { it.copy(isLoading = false, error = "Ошибка регистрации") }
+                is Result.Error -> _state.update { it.copy(isLoading = false, error = result.error.toUserMessage()) }
             }
         }
     }

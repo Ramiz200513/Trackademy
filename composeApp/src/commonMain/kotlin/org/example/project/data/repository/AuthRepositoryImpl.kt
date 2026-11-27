@@ -1,105 +1,80 @@
 package org.example.project.data.repository
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import com.russhwolf.settings.Settings
-import io.ktor.client.statement.bodyAsText
-import kotlinx.serialization.json.Json
-import org.example.project.core.network.Result
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import org.example.project.core.domain.NetworkError
-import org.example.project.data.remote.dto.*
+import org.example.project.core.network.Result
+import org.example.project.core.network.ensureSuccess
+import org.example.project.core.network.safeApiCall
+import org.example.project.core.session.SessionStorage
+import org.example.project.core.session.UserRole
 import org.example.project.data.mapper.toDomain
-import org.example.project.domain.models.*
+import org.example.project.data.remote.dto.LoginRequest
+import org.example.project.data.remote.dto.LoginResponse
+import org.example.project.data.remote.dto.OrganizationDto
+import org.example.project.data.remote.dto.RegisterRequest
+import org.example.project.data.remote.dto.UserDto
+import org.example.project.domain.models.Organization
+import org.example.project.domain.models.User
 import org.example.project.domain.repository.AuthRepository
-import org.example.project.core.network.Result.Success
-import org.example.project.core.network.Result.Error
 import org.example.project.domain.repository.RegisterParams
 
 class AuthRepositoryImpl(
     private val httpClient: HttpClient,
-    private val settings: Settings
+    private val session: SessionStorage
 ) : AuthRepository {
 
-    override suspend fun getOrganizations(): Result<List<Organization>, NetworkError> {
-        return safeApiCall {
-            val dtos = httpClient.get("api/Organization").body<List<OrganizationDto>>()
-            dtos.map { it.toDomain() }
+    override suspend fun getOrganizations(): Result<List<Organization>, NetworkError> =
+        safeApiCall(TAG) {
+            httpClient.get("api/Organization")
+                .ensureSuccess()
+                .body<List<OrganizationDto>>()
+                .map { it.toDomain() }
         }
-    }
 
-    override suspend fun login(login: String, pass: String, orgId: String): Result<Unit, NetworkError> {
-        return try {
-            val response = httpClient.post("api/Auth/login") {
-                setBody(LoginRequest(login, pass, orgId))
+    override suspend fun login(login: String, pass: String, orgId: String): Result<Unit, NetworkError> =
+        safeApiCall(TAG) {
+            val data = httpClient.post("api/Auth/login") {
                 contentType(ContentType.Application.Json)
-            }
-            if (response.status == HttpStatusCode.OK) {
-                val data = response.body<LoginResponse>()
-                settings.putString("token", data.token)
-                if (data.refreshToken != null) {
-                    settings.putString("refreshToken", data.refreshToken)
-                }
-                settings.putString("orgId", orgId)
-                data.user?.fullName?.let { settings.putString("fullName", it) }
+                setBody(LoginRequest(login, pass, orgId))
+            }.ensureSuccess().body<LoginResponse>()
 
-                val roleString = data.user?.role
-                val userRole = when (roleString) {
-                    "Student" -> 1
-                    "Administrator" -> 2
-                    "Teacher" -> 3
-                    else -> 0
-                }
-                settings.putInt("userRole", userRole)
-
-                Result.Success(Unit)
-            } else {
-                Result.Error(NetworkError.Unknown)
-            }
-        } catch (e: Exception) {
-            println("LOGIN EXCEPTION: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            session.saveTokens(data.token, data.refreshToken)
+            session.organizationId = orgId
+            data.user?.fullName?.let { session.fullName = it }
+            session.userRole = UserRole.fromApi(data.user?.role)
         }
-    }
-    override suspend fun register(params:RegisterParams):Result<Unit, NetworkError>{
-        return safeApiCall {
 
+    override suspend fun register(params: RegisterParams): Result<Unit, NetworkError> =
+        safeApiCall(TAG) {
             httpClient.post("api/auth/register-admin") {
                 contentType(ContentType.Application.Json)
-                setBody(RegisterRequest(
-                    fullName = params.fullName,
-                    login = params.login,
-                    password = params.password,
-                    phone = params.phone,
-                    birthday = params.birthday,
-                    organizationId = params.organizationId,
-                    activationKey = params.activationKey
-                ))
-            }
+                setBody(
+                    RegisterRequest(
+                        fullName = params.fullName,
+                        login = params.login,
+                        password = params.password,
+                        phone = params.phone,
+                        birthday = params.birthday,
+                        organizationId = params.organizationId,
+                        activationKey = params.activationKey
+                    )
+                )
+            }.ensureSuccess()
             Unit
         }
-    }
 
-    override suspend fun getCurrentUser(): Result<User, NetworkError> {
-            return safeApiCall {
-                val token = settings.getString("token","")
-                val response = httpClient.get("api/Auth/me"){
-                    header(HttpHeaders.Authorization,"Bearer $token")
-                }
-                response.body<UserDto>().toDomain()
-            }
-    }
-
-    private suspend fun <T> safeApiCall(block: suspend () -> T): Result<T, NetworkError> {
-        return try {
-            Result.Success(block())
-        } catch (e: io.ktor.client.plugins.ClientRequestException) {
-            Result.Error(NetworkError.Unknown)
-        } catch (e: io.ktor.utils.io.errors.IOException) {
-            Result.Error(NetworkError.NoInternet)
-        } catch (e: Exception) {
-            Result.Error(NetworkError.ServerError)
+    override suspend fun getCurrentUser(): Result<User, NetworkError> =
+        safeApiCall(TAG) {
+            httpClient.get("api/Auth/me").ensureSuccess().body<UserDto>().toDomain()
         }
+
+    private companion object {
+        const val TAG = "AuthRepository"
     }
 }

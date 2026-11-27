@@ -7,5 +7,8 @@ sealed interface NetworkError : RootError {
     data object ServerError : NetworkError
     data object Serialization : NetworkError
     data object Unauthorized : NetworkError
+    data object Forbidden : NetworkError
+    data object NotFound : NetworkError
+    data object BadRequest : NetworkError
     data object Unknown : NetworkError
 }
