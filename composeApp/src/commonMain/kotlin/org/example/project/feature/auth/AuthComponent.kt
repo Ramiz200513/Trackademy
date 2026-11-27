@@ -1,99 +1,77 @@
 package org.example.project.feature.auth
 
 import com.arkivanov.decompose.ComponentContext
-import com.arkivanov.essenty.lifecycle.coroutines.coroutineScope
-import com.russhwolf.settings.Settings
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import org.example.project.core.domain.NetworkError
+import org.example.project.core.network.Result
+import org.example.project.core.presentation.BaseComponent
+import org.example.project.core.session.SessionStorage
+import org.example.project.core.ui.error.toUserMessage
 import org.example.project.domain.repository.AuthRepository
 import org.example.project.domain.repository.RegisterParams
-
-
-import org.example.project.core.network.Result
-import org.example.project.core.domain.NetworkError
-import org.example.project.core.ui.error.toUserMessage
 
 class AuthComponent(
     componentContext: ComponentContext,
     private val repository: AuthRepository,
-    private val settings: Settings,
+    private val session: SessionStorage,
     private val onRootNavigate: () -> Unit
-): ComponentContext by componentContext {
-
-    private val scope = coroutineScope()
-    private val _state = MutableStateFlow(AuthState())
-    val state = _state.asStateFlow()
+) : BaseComponent<AuthState, Nothing>(componentContext, AuthState()) {
 
     init {
         handleIntent(AuthIntent.LoadOrganizations)
     }
 
-
     fun handleIntent(intent: AuthIntent) {
         when (intent) {
-            is AuthIntent.LoadOrganizations -> loadOrgs()
-            is AuthIntent.UpdateRegistrationField -> {
-                _state.update { it.copy(registrationDraft = intent.draft) }
-            }
+            is AuthIntent.LoadOrganizations -> loadOrganizations()
+            is AuthIntent.UpdateRegistrationField -> updateState { copy(registrationDraft = intent.draft) }
             is AuthIntent.RegisterClicked -> register()
-            is AuthIntent.ToggleAuthMode -> {
-                _state.update {
-                    val newMode = if (it.authMode == AuthMode.LOGIN) AuthMode.REGISTER else AuthMode.LOGIN
-                    it.copy(authMode = newMode, error = null)
-                }
+            is AuthIntent.ToggleAuthMode -> updateState {
+                val newMode = if (authMode == AuthMode.LOGIN) AuthMode.REGISTER else AuthMode.LOGIN
+                copy(authMode = newMode, error = null)
             }
             is AuthIntent.LoginClicked -> login()
-            is AuthIntent.UpdateLoginFields -> {
-                _state.update { it.copy(
-                    loginInput = intent.login,
-                    passwordInput = intent.pass,
-                    selectedOrgId = intent.orgId
-                ) }
+            is AuthIntent.UpdateLoginFields -> updateState {
+                copy(loginInput = intent.login, passwordInput = intent.pass, selectedOrgId = intent.orgId)
             }
         }
     }
+
     private fun login() {
-        scope.launch {
-            _state.update { it.copy(isLoading = true) }
-
+        if (currentState.isLoading) return
+        launch {
+            updateState { copy(isLoading = true, error = null) }
             val result = repository.login(
-                login = _state.value.loginInput,
-                pass = _state.value.passwordInput,
-                orgId = _state.value.selectedOrgId
+                login = currentState.loginInput.trim(),
+                pass = currentState.passwordInput,
+                orgId = currentState.selectedOrgId
             )
-
             when (result) {
-                is Result.Success -> {
-                    onRootNavigate()
-                }
+                is Result.Success -> onRootNavigate()
                 is Result.Error -> {
                     val message = when (result.error) {
                         NetworkError.Unauthorized, NetworkError.BadRequest -> "Неверный логин или пароль"
                         else -> result.error.toUserMessage()
                     }
-                    _state.update { it.copy(isLoading = false, error = message) }
+                    updateState { copy(isLoading = false, error = message) }
                 }
             }
         }
     }
 
-
-    private fun loadOrgs(){
-        scope.launch {
-            when(val result = repository.getOrganizations()){
-                is Result.Success -> _state.update { it.copy(organizations = result.data) }
-                is Result.Error -> _state.update { it.copy(error = result.error.toUserMessage()) }
+    private fun loadOrganizations() {
+        launch {
+            when (val result = repository.getOrganizations()) {
+                is Result.Success -> updateState { copy(organizations = result.data) }
+                is Result.Error -> updateState { copy(error = result.error.toUserMessage()) }
             }
         }
     }
 
     private fun register() {
-        scope.launch {
-            _state.update { it.copy(isLoading = true) }
-            val draft = _state.value.registrationDraft
-
+        if (currentState.isLoading) return
+        launch {
+            updateState { copy(isLoading = true, error = null) }
+            val draft = currentState.registrationDraft
             val params = RegisterParams(
                 fullName = draft.fullName,
                 login = draft.login,
@@ -103,18 +81,14 @@ class AuthComponent(
                 organizationId = draft.organizationId,
                 activationKey = draft.activationKey
             )
-
             when (val result = repository.register(params)) {
                 is Result.Success -> {
-                    // При регистрации имя у нас уже есть прямо в черновике!
-                    settings.putString("orgId", draft.organizationId)
-                    settings.putString("fullName", draft.fullName)
-
+                    session.organizationId = draft.organizationId
+                    session.fullName = draft.fullName
                     onRootNavigate()
                 }
-                is Result.Error -> _state.update { it.copy(isLoading = false, error = result.error.toUserMessage()) }
+                is Result.Error -> updateState { copy(isLoading = false, error = result.error.toUserMessage()) }
             }
         }
     }
-
 }

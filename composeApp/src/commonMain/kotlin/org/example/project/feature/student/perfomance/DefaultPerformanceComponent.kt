@@ -1,14 +1,11 @@
 package org.example.project.feature.student.perfomance
 
 import com.arkivanov.decompose.ComponentContext
-import com.arkivanov.essenty.lifecycle.coroutines.coroutineScope
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import org.example.project.core.network.Result
+import org.example.project.core.presentation.BaseComponent
+import org.example.project.core.ui.error.toUserMessage
+import org.example.project.core.utils.toInitials
 import org.example.project.domain.repository.AuthRepository
 import org.example.project.domain.repository.PerformanceRepository
 import org.example.project.feature.performance.PerformanceComponent
@@ -18,11 +15,8 @@ class DefaultPerformanceComponent(
     private val repository: PerformanceRepository,
     private val authRepository: AuthRepository,
     private val onNavigateToAssignment: (String) -> Unit
-) : PerformanceComponent, ComponentContext by componentContext {
-
-    private val scope = coroutineScope()
-    private val _state = MutableStateFlow(PerformanceState())
-    override val state: StateFlow<PerformanceState> = _state.asStateFlow()
+) : BaseComponent<PerformanceState, Nothing>(componentContext, PerformanceState()),
+    PerformanceComponent {
 
     init {
         onIntent(PerformanceIntent.Refresh)
@@ -36,35 +30,35 @@ class DefaultPerformanceComponent(
     }
 
     private fun loadData() {
-        scope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+        launch {
+            updateState { copy(isLoading = true, error = null) }
 
+            // Both requests run in parallel
             val dashboardDeferred = async { repository.getPerformanceData() }
             val userDeferred = async { authRepository.getCurrentUser() }
-
             val dashboardResult = dashboardDeferred.await()
             val userResult = userDeferred.await()
 
-            if (dashboardResult is Result.Success) {
-                val d = dashboardResult.data
-                val fullName = if (userResult is Result.Success) userResult.data.fullName else "Студент"
-
-                // Вычисляем инициалы
-                val initials = fullName.split(" ").filter { it.isNotBlank() }
-                    .mapNotNull { it.firstOrNull()?.toString()?.uppercase() }.take(2).joinToString("")
-
-                _state.update { it.copy(
-                    isLoading = false,
-                    avgGrade = d.averageGrade,
-                    attendance = d.attendanceRate,
-                    activeCount = d.activeAssignmentsCount,
-                    assignments = d.assignments,
-                    grades = d.grades,
-                    userName = fullName,
-                    userInitials = initials // <--- Передаем инициалы в стейт
-                ) }
-            } else if (dashboardResult is Result.Error) {
-                _state.update { it.copy(isLoading = false, error = "Ошибка загрузки данных") }
+            when (dashboardResult) {
+                is Result.Success -> {
+                    val data = dashboardResult.data
+                    val fullName = (userResult as? Result.Success)?.data?.fullName ?: "Студент"
+                    updateState {
+                        copy(
+                            isLoading = false,
+                            avgGrade = data.averageGrade,
+                            attendance = data.attendanceRate,
+                            activeCount = data.activeAssignmentsCount,
+                            assignments = data.assignments,
+                            grades = data.grades,
+                            userName = fullName,
+                            userInitials = fullName.toInitials()
+                        )
+                    }
+                }
+                is Result.Error -> updateState {
+                    copy(isLoading = false, error = dashboardResult.error.toUserMessage())
+                }
             }
         }
     }
