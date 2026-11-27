@@ -1,5 +1,16 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// Release signing: keystore.properties (local) or env vars (CI). Never committed.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun signingValue(key: String, env: String): String? =
+    keystoreProps.getProperty(key) ?: System.getenv(env)
+
+// API base URL can be overridden per environment: -PapiBaseUrl=https://api.example.com/
+val apiBaseUrl: String = (findProperty("apiBaseUrl") as String?) ?: "https://dev.trackademy.kz/"
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -28,10 +39,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("io.coil-kt.coil3:coil-compose:3.0.4")
-            implementation("io.github.vinceglb:filekit-compose:0.8.0") // Проверь свежую версию
-            implementation("io.github.onseok:peekaboo-ui:0.5.2")
-            implementation("io.github.onseok:peekaboo-image-picker:0.5.2")
+            implementation(libs.coil.compose)
+            implementation(libs.filekit.compose)
+            implementation(libs.peekaboo.ui)
+            implementation(libs.peekaboo.image.picker)
+            implementation(libs.kotlinx.coroutines.core)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.decompose.core)
@@ -50,7 +62,7 @@ kotlin {
             implementation(libs.ktor.client.logging)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.kotlinx.datetime)
-            implementation("io.ktor:ktor-client-auth:2.3.8")
+            implementation(libs.ktor.client.auth)
         }
 
         androidMain.dependencies {
@@ -76,6 +88,9 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+            implementation(libs.multiplatform.settings.test)
         }
     }
 }
@@ -85,11 +100,26 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "org.example.project"
+        applicationId = "kz.trackademy.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "1.0.0"
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+    }
+    buildFeatures {
+        buildConfig = true
+    }
+    signingConfigs {
+        create("release") {
+            val storePath = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
+            if (storePath != null) {
+                storeFile = rootProject.file(storePath)
+                storePassword = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "ANDROID_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "ANDROID_KEY_PASSWORD")
+            }
+        }
     }
     packaging {
         resources {
@@ -97,8 +127,19 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            val release = signingConfigs.getByName("release")
+            if (release.storeFile != null) signingConfig = release
         }
     }
     compileOptions {

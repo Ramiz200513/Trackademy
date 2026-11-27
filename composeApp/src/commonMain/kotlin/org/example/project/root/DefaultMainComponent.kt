@@ -7,6 +7,7 @@ import com.arkivanov.decompose.router.stack.bringToFront
 import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.value.Value
 import com.russhwolf.settings.Settings
+import org.example.project.core.session.SessionStorage
 import kotlinx.serialization.Serializable
 import org.example.project.domain.repository.AssignmentRepository
 import org.example.project.domain.repository.AuthRepository
@@ -37,6 +38,7 @@ class DefaultMainComponent(
     private val profileRepository: ProfileRepository,
     private val fileSaver: FileSaver,
     private val settings: Settings,
+    private val session: SessionStorage,
     private val onLogout: () -> Unit,
     private val teacherRepository: TeacherRepository,
     override val userRole: Int,
@@ -52,10 +54,6 @@ class DefaultMainComponent(
         handleBackButton = true,
         childFactory = ::createChild
     )
-
-    init {
-        println("MAIN COMPONENT INIT, orgId=$orgId, userRole=$userRole")
-    }
 
     private fun createChild(
         config: Config,
@@ -106,7 +104,7 @@ class DefaultMainComponent(
                             componentContext,
                             dashboardRepository,
                             onLogout,
-                            settings
+                            session
                         )
                     )
                 }

@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -23,33 +26,29 @@ class PerformanceRepositoryImpl(
 
     override suspend fun getPerformanceData(): Result<Performance, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val userRole = settings.getInt("userRole", 0)
             val endpoint = if (userRole == 1) "api/Dashboard/student" else "api/Dashboard/teacher"
 
-            println("DEBUG: Используем токен: ${token.take(10)}...")
-            println("DEBUG: Role=$userRole, endpoint=$endpoint")
+            AppLogger.d("PerformanceRepository", "DEBUG: Role=$userRole, endpoint=$endpoint")
 
-            val response = httpClient.get(endpoint) {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get(endpoint)
 
-            println("DEBUG: Статус ответа: ${response.status}")
+            AppLogger.d("PerformanceRepository", "DEBUG: Статус ответа: ${response.status}")
 
             if (response.status.value in 200..299) {
                 val bodyText = response.bodyAsText()
-                println("DEBUG: Тело ответа: $bodyText")
+                AppLogger.d("PerformanceRepository", "DEBUG: Тело ответа: $bodyText")
                 val json = Json { ignoreUnknownKeys = true }
                 val dto = json.decodeFromString<PerformanceDto>(bodyText)
                 Result.Success(dto.toDomain())
             } else {
                 val bodyText = response.bodyAsText()
-                println("DEBUG: Тело ошибки: $bodyText")
-                Result.Error(NetworkError.ServerError)
+                AppLogger.d("PerformanceRepository", "DEBUG: Тело ошибки: $bodyText")
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("DEBUG: Исключение при загрузке: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("PerformanceRepository", "DEBUG: Исключение при загрузке: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 }

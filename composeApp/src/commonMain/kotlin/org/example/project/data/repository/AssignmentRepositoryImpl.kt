@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import org.example.project.core.network.Result
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -35,20 +38,17 @@ class AssignmentRepositoryImpl(
 
     override suspend fun getAssignmentDetails(id: String): Result<AssignmentDetailDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Assignment/$id") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
-            println("📋 DETAILS RAW: ${response.bodyAsText()}")
+            val response = httpClient.get("api/Assignment/$id")
+            AppLogger.d("AssignmentRepository", "📋 DETAILS RAW: ${response.bodyAsText()}")
 
             if (response.status.value in 200..299) {
                 Result.Success(response.body<AssignmentDetailDto>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("DETAILS ERROR: ${e::class.simpleName} — ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("AssignmentRepository", "DETAILS ERROR: ${e::class.simpleName} — ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 
@@ -58,10 +58,8 @@ class AssignmentRepositoryImpl(
         fileBytes: ByteArray?
     ): Result<Unit, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
 
             val draftResponse = httpClient.post("api/Submission/assignment/$assignmentId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
 
                 setBody(
                     MultiPartFormDataContent(
@@ -87,27 +85,24 @@ class AssignmentRepositoryImpl(
                 val submission = draftResponse.body<SubmissionResponseDto>()
                 val submissionId = submission.id
 
-                val submitResponse = httpClient.post("api/Submission/$submissionId/submit") {
-                    header(HttpHeaders.Authorization, "Bearer $token")
-                }
+                val submitResponse = httpClient.post("api/Submission/$submissionId/submit")
 
                 if (submitResponse.status.value in 200..299) {
                     Result.Success(Unit)
                 } else {
-                    Result.Error(NetworkError.ServerError)
+                    Result.Error(submitResponse.status.toNetworkError())
                 }
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(draftResponse.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("SUBMIT ERROR: ${e::class.simpleName} — ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("AssignmentRepository", "SUBMIT ERROR: ${e::class.simpleName} — ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 
     override suspend fun downloadFile(url: String): Result<ByteArray, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
 
             val path = when {
                 url.startsWith("http") -> url
@@ -115,49 +110,42 @@ class AssignmentRepositoryImpl(
                 else -> "api/$url"
             }
 
-            println("🌐 FINAL PATH: $path")
+            AppLogger.d("AssignmentRepository", "🌐 FINAL PATH: $path")
 
-            val response = httpClient.get(path) {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get(path)
 
-            println("📡 STATUS: ${response.status.value}")
+            AppLogger.d("AssignmentRepository", "📡 STATUS: ${response.status.value}")
 
             if (response.status.value in 200..299) {
                 Result.Success(response.readBytes())
             } else {
-                println("❌ ERROR BODY: ${response.bodyAsText()}")
-                Result.Error(NetworkError.ServerError)
+                AppLogger.d("AssignmentRepository", "❌ ERROR BODY: ${response.bodyAsText()}")
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("❌ EXCEPTION: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("AssignmentRepository", "❌ EXCEPTION: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun getSubmissionDetails(submissionId: String): Result<SubmissionDetailFullDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Submission/$submissionId") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
-            println("📋 SUBMISSION RAW: ${response.bodyAsText()}")
+            val response = httpClient.get("api/Submission/$submissionId")
+            AppLogger.d("AssignmentRepository", "📋 SUBMISSION RAW: ${response.bodyAsText()}")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<SubmissionDetailFullDto>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("SUBMISSION ERROR: ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("AssignmentRepository", "SUBMISSION ERROR: ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
     override suspend fun getMyAssignments(): Result<List<AssignmentGroup>, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
             val orgId = settings.getString("orgId", "")
 
             val response = httpClient.post("api/Assignment/my-assignments") {
-                header(HttpHeaders.Authorization, "Bearer $token")
                 val jsonPayload = """{"organizationId":"$orgId"}"""
                 setBody(TextContent(jsonPayload, ContentType.Application.Json))
             }
@@ -173,11 +161,11 @@ class AssignmentRepositoryImpl(
 
                 Result.Success(groups)
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            println("ASSIGNMENT ERROR: ${e::class.simpleName} — ${e.message}")
-            Result.Error(NetworkError.Unknown)
+            AppLogger.d("AssignmentRepository", "ASSIGNMENT ERROR: ${e::class.simpleName} — ${e.message}")
+            Result.Error(e.toNetworkError())
         }
     }
 }

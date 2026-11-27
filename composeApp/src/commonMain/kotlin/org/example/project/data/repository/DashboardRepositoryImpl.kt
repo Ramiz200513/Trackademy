@@ -1,5 +1,8 @@
 package org.example.project.data.repository
 
+import org.example.project.core.logging.AppLogger
+import org.example.project.core.network.toNetworkError
+
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -18,17 +21,14 @@ class DashboardRepositoryImpl(
 
     override suspend fun getTeacherDashboard(): Result<DashboardDto, NetworkError> {
         return try {
-            val token = settings.getString("token", "")
-            val response = httpClient.get("api/Dashboard/teacher") {
-                header(HttpHeaders.Authorization, "Bearer $token")
-            }
+            val response = httpClient.get("api/Dashboard/teacher")
             if (response.status.value in 200..299) {
                 Result.Success(response.body<DashboardDto>())
             } else {
-                Result.Error(NetworkError.ServerError)
+                Result.Error(response.status.toNetworkError())
             }
         } catch (e: Exception) {
-            Result.Error(NetworkError.Unknown)
+            Result.Error(e.toNetworkError())
         }
     }
 }
